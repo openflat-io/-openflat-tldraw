@@ -1,12 +1,12 @@
 {
     "name": "tldraw-store",
-    "version": "0.0.1",
+    "version": "0.0.3",
     "description": "A react store hook for tldraw",
-    "main": "/dist/index.js",
-    "exports": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-    },
+    "main": "./dist/index.js",
+    "files": [
+        "dist",
+        "README.md"
+    ],
     "scripts": {
         "prebuild": "node ./scripts/clean.js",
         "test": "concurrently \"vite\" \"HOST=localhost PORT=1234 npx y-websocket\" --kill-others",
