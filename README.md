@@ -4,4 +4,4 @@ A React Hook-based npm package for seamlessly integrating Yjs in drawing apps, e
 
 ## License
 
-MIT @ [syt-honey](https://github.com/syt-honey)
+MIT @ [Openflat](https://github.com/openflat-io)
