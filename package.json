@@ -1,5 +1,5 @@
 {
-    "name": "@openflat/tldraw",
+    "name": "tldraw-store",
     "version": "0.0.1",
     "description": "A react store hook for tldraw",
     "main": "/dist/index.js",
