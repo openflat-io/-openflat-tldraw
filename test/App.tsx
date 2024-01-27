@@ -13,7 +13,7 @@ export const App = (): React.ReactElement => {
 
     return (
         <div style={{ width: "100vw", height: "100vh" }}>
-            <Tldraw store={store} />
+            <Tldraw store={store} onMount={editor => void editor.setCurrentTool('draw')} />
         </div>
     )
 }

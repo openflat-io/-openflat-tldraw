@@ -16,13 +16,17 @@ import {
     transact,
 } from "@tldraw/tldraw";
 import { useEffect, useMemo, useState } from "react";
-import { YKeyValue } from "y-utility/y-keyvalue";
-import { WebsocketProvider } from "y-websocket";
-import * as Y from "yjs";
 import { DEFAULT_STORE } from "./default_store";
 
+import { SyncedStorage } from "synced-store";
+
+/**
+ * sync the tldraw store with a yjs doc
+ * @param param
+ * @returns the tldraw store and its status
+ */
 export function useYjsStore({
-    roomId = "example",
+    roomId = "roomid-example1112",
     hostUrl = "wss://demos.yjs.dev",
     shapeUtils = [],
     defaultStore = DEFAULT_STORE,
@@ -33,6 +37,7 @@ export function useYjsStore({
     shapeUtils: TLAnyShapeUtilConstructor[];
     defaultStore: StoreSnapshot<TLRecord>;
 }>): TLStoreWithStatus {
+    // Create the tldraw store
     const [store] = useState(() => {
         const store = createTLStore({
             shapeUtils: [...defaultShapeUtils, ...shapeUtils],
@@ -45,24 +50,29 @@ export function useYjsStore({
         status: "loading",
     });
 
-    const { yDoc, yStore, room } = useMemo(() => {
-        const yDoc = new Y.Doc({ gc: true });
-        const yArr = yDoc.getArray<{ key: string; val: TLRecord }>(`tl_${roomId}`);
-        const yStore = new YKeyValue(yArr);
+    // Create the synced storage
+    const { syncedStorage, room } = useMemo(() => {
+        const syncedStorage = new SyncedStorage<TLRecord>(
+            roomId,
+            {
+                id: `tl_${roomId}`,
+            } as TLRecord,
+            hostUrl,
+        );
 
         return {
-            yDoc,
-            yStore,
-            room: new WebsocketProvider(hostUrl, roomId, yDoc, { connect: true }),
+            syncedStorage,
+            room: syncedStorage.provider,
         };
     }, [hostUrl, roomId]);
 
     useEffect(() => {
         setStoreWithStatus({ status: "loading" });
 
+        let hasConnectedBefore = false;
         const unsubs: Array<() => void> = [];
 
-        function handleSync(): void {
+        function handleRoomSync(): void {
             // 1.
             // Connect store to yjs store and vis versa, for both the document and awareness
 
@@ -72,18 +82,10 @@ export function useYjsStore({
             unsubs.push(
                 store.listen(
                     function syncStoreChangesToYjsDoc({ changes }) {
-                        yDoc.transact(() => {
-                            Object.values(changes.added).forEach(record => {
-                                yStore.set(record.id, record);
-                            });
-
-                            Object.values(changes.updated).forEach(([, record]) => {
-                                yStore.set(record.id, record);
-                            });
-
-                            Object.values(changes.removed).forEach(record => {
-                                yStore.delete(record.id);
-                            });
+                        syncedStorage.doc.transact(() => {
+                            syncedStorage.setState(changes.added);
+                            syncedStorage.setState(changes.updated);
+                            syncedStorage.deleteState(changes.removed);
                         });
                     },
                     { source: "user", scope: "document" }, // only sync user's document changes
@@ -91,50 +93,24 @@ export function useYjsStore({
             );
 
             // Sync the yjs doc changes to the store
-            const handleChange = (
-                changes: Map<
-                    string,
-                    | { action: "delete"; oldValue: TLRecord }
-                    | { action: "update"; oldValue: TLRecord; newValue: TLRecord }
-                    | { action: "add"; newValue: TLRecord }
-                >,
-                transaction: Y.Transaction,
-            ): void => {
+            const handleChange = (changes, transaction): void => {
                 if (transaction.local) {
                     return;
                 }
 
-                const toRemove: Array<TLRecord["id"]> = [];
-                const toPut: TLRecord[] = [];
-
-                changes.forEach((change, id) => {
-                    switch (change.action) {
-                        case "add":
-                        case "update": {
-                            const record = yStore.get(id)!;
-                            toPut.push(record);
-                            break;
-                        }
-                        case "delete": {
-                            toRemove.push(id as TLRecord["id"]);
-                            break;
-                        }
-                    }
-                });
-
                 // put / remove the records in the store
                 store.mergeRemoteChanges(() => {
-                    if (toRemove.length) {
-                        store.remove(toRemove);
+                    if (changes.toRemove) {
+                        store.remove(changes.toRemove as Array<TLRecord["id"]>);
                     }
-                    if (toPut.length) {
-                        store.put(toPut);
+                    if (changes.toPut) {
+                        store.put(changes.toPut);
                     }
                 });
             };
 
-            yStore.on("change", handleChange);
-            unsubs.push(() => yStore.off("change", handleChange));
+            syncedStorage.onStateChanged(handleChange);
+            unsubs.push(() => syncedStorage.onStateOff(handleChange));
 
             /* -------------------- Awareness ------------------- */
 
@@ -225,23 +201,23 @@ export function useYjsStore({
             // Initialize the store with the yjs doc records—or, if the yjs doc
             // is empty, initialize the yjs doc with the default store records.
 
-            if (yStore.yarray.length) {
+            if (syncedStorage.getState().length > 0) {
                 // Replace the store records with the yjs doc records
                 transact(() => {
                     // The records here should be compatible with what's in the store
                     store.clear();
-                    const records = yStore.yarray.toJSON().map(({ val }) => val);
+                    const records = syncedStorage
+                        .getState()
+                        .filter(({ key, val }) => key && val)
+                        .map(({ val }) => val);
                     store.put(records);
                 });
-
             } else {
                 // Create the initial store records
                 // Sync the store records to the yjs doc
-                yDoc.transact(() => {
-                    for (const record of store.allRecords()) {
-                        yStore.set(record.id, record);
-                    }
-                });
+                for (const record of store.allRecords()) {
+                    syncedStorage.initializeState(record);
+                }
             }
 
             setStoreWithStatus({
@@ -251,9 +227,11 @@ export function useYjsStore({
             });
         }
 
-        let hasConnectedBefore = false;
-
-        function handleStatusChange({ status }: { status: "disconnected" | "connected" }): void {
+        function handleRoomStatusChange({
+            status,
+        }: {
+            status: "disconnected" | "connected";
+        }): void {
             // If we're disconnected, set the store status to 'synced-remote' and the connection status to 'offline'
             if (status === "disconnected") {
                 setStoreWithStatus({
@@ -264,26 +242,27 @@ export function useYjsStore({
                 return;
             }
 
-            room.off("synced", handleSync);
+            room.off("synced", handleRoomSync);
 
             if (status === "connected") {
                 if (hasConnectedBefore) {
                     return;
                 }
                 hasConnectedBefore = true;
-                room.on("synced", handleSync);
-                unsubs.push(() => room.off("synced", handleSync));
+                room.on("synced", handleRoomSync);
+                unsubs.push(() => room.off("synced", handleRoomSync));
             }
         }
 
-        room.on("status", handleStatusChange);
-        unsubs.push(() => room.off("status", handleStatusChange));
+        room.on("status", handleRoomStatusChange);
+        unsubs.push(() => room.off("status", handleRoomStatusChange));
+        unsubs.push(syncedStorage.dispose);
 
         return () => {
             unsubs.forEach(fn => fn());
             unsubs.length = 0;
         };
-    }, [room, yDoc, store, yStore]);
+    }, [room, store, syncedStorage]);
 
     return storeWithStatus;
 }
