@@ -12,8 +12,8 @@ dependencies:
     specifier: ^18.2.0
     version: 18.2.0
   synced-store:
-    specifier: ^0.0.2
-    version: 0.0.2
+    specifier: ^0.0.3
+    version: 0.0.3
 
 devDependencies:
   '@types/react':
@@ -2368,8 +2368,8 @@ packages:
       has-flag: 4.0.0
     dev: true
 
-  /synced-store@0.0.2:
-    resolution: {integrity: sha512-556AUiyqF1Kinv8+6BIhNOEZ79Nn4YKGmq3+4RJ2h4fR26NtNOG4MDovavHR3046try4X+hS2y6Oo+uXvr1Grw==}
+  /synced-store@0.0.3:
+    resolution: {integrity: sha512-+wAIRTzOq6h8dNeaB5bRTY4Oul/YDt6XGq1RbpoaZUTiUH2eZxQgwbVBWZf8Cl4YpWSPsA4BU7g2C5N6et5UJQ==}
     dependencies:
       y-utility: 0.1.3(yjs@13.6.11)
       y-websocket: 1.5.3(yjs@13.6.11)

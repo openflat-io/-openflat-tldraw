@@ -1,6 +1,6 @@
 {
     "name": "tldraw-store",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "description": "A react store hook for tldraw",
     "main": "./dist/index.js",
     "files": [
@@ -31,6 +31,6 @@
     "dependencies": {
         "@tldraw/tldraw": "v2.0.0-beta.2",
         "react": "^18.2.0",
-        "synced-store": "^0.0.2"
+        "synced-store": "^0.0.3"
     }
 }

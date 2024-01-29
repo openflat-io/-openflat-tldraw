@@ -1,7 +1,7 @@
 import { InstancePresenceRecordType, computed, createPresenceStateDerivation, createTLStore, defaultShapeUtils, defaultUserPreferences, getUserPreferences, setUserPreferences, react, transact, } from "@tldraw/tldraw";
 import { useEffect, useMemo, useState } from "react";
 import { DEFAULT_STORE } from "./default_store";
-import { SyncedStorage } from "synced-store";
+import { TlDrawSyncedStorage } from "synced-store";
 /**
  * sync the tldraw store with a yjs doc
  * @param param
@@ -21,7 +21,7 @@ export function useYjsStore({ roomId = "roomid-example1112", hostUrl = "wss://de
     });
     // Create the synced storage
     const { syncedStorage, room } = useMemo(() => {
-        const syncedStorage = new SyncedStorage(roomId, {
+        const syncedStorage = new TlDrawSyncedStorage(roomId, {
             id: `tl_${roomId}`,
         }, hostUrl);
         return {
